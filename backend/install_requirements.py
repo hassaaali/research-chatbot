@@ -61,34 +61,33 @@ def main():
     for package in doc_packages:
         install_package(package)
     
-    # Try to install spaCy
-    print("\n🔤 Installing spaCy...")
-    if install_package("spacy==3.7.2"):
-        print("📥 Downloading spaCy English model...")
-        run_command("python -m spacy download en_core_web_sm", "Downloading spaCy model")
-    
-    # Vector and ML dependencies
-    print("\n🧠 Installing ML and vector dependencies...")
-    
-    # Install numpy first
-    install_package("numpy==1.24.4", "Installing NumPy")
+    # Install numpy first with compatible version
+    print("\n🔢 Installing NumPy with compatible version...")
+    install_package("'numpy>=1.19.0,<2.0'", "Installing NumPy")
     
     # Install PyTorch (CPU version for compatibility)
-    print("🔥 Installing PyTorch...")
+    print("\n🔥 Installing PyTorch...")
     torch_command = "pip install torch==2.1.2 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu"
     run_command(torch_command, "Installing PyTorch CPU")
     
     # Install other ML packages
     ml_packages = [
+        "scikit-learn==1.3.2",
         "sentence-transformers==2.2.2",
         "transformers==4.36.2",
         "accelerate==0.25.0",
-        "scikit-learn==1.3.2",
         "faiss-cpu==1.7.4"
     ]
     
+    print("\n🧠 Installing ML dependencies...")
     for package in ml_packages:
         install_package(package)
+    
+    # Try to install spaCy
+    print("\n🔤 Installing spaCy...")
+    if install_package("spacy==3.7.2"):
+        print("📥 Downloading spaCy English model...")
+        run_command("python -m spacy download en_core_web_sm", "Downloading spaCy model")
     
     # Web and utility dependencies
     util_packages = [
