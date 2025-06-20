@@ -7,22 +7,22 @@ import sys
 
 def run_command(command, description):
     """Run a command and handle errors gracefully"""
-    print(f"\n🔄 {description}...")
+    print(f"\n[INFO] {description}...")
     try:
         result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
-        print(f"✅ {description} completed successfully")
+        print(f"[SUCCESS] {description} completed successfully")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"❌ {description} failed:")
+        print(f"[ERROR] {description} failed:")
         print(f"Error: {e.stderr}")
         return False
 
 def main():
-    print("🔧 Installing Compatible Versions")
+    print("Installing Compatible Versions")
     print("=" * 40)
     
     # Step 1: Uninstall problematic packages
-    print("\n🗑️ Removing problematic packages...")
+    print("\n[INFO] Removing problematic packages...")
     packages_to_remove = [
         "sentence-transformers",
         "transformers", 
@@ -35,29 +35,29 @@ def main():
         run_command(f"pip uninstall {package} -y", f"Removing {package}")
     
     # Step 2: Install compatible huggingface-hub first
-    print("\n📦 Installing compatible huggingface-hub...")
+    print("\n[INFO] Installing compatible huggingface-hub...")
     if not run_command("pip install 'huggingface-hub>=0.16.0,<0.20.0'", "Installing huggingface-hub"):
-        print("❌ Failed to install compatible huggingface-hub")
+        print("[ERROR] Failed to install compatible huggingface-hub")
         return False
     
     # Step 3: Install tokenizers
-    print("\n📦 Installing tokenizers...")
+    print("\n[INFO] Installing tokenizers...")
     run_command("pip install 'tokenizers>=0.13.0,<0.16.0'", "Installing tokenizers")
     
     # Step 4: Install transformers with compatible version
-    print("\n📦 Installing transformers...")
+    print("\n[INFO] Installing transformers...")
     if not run_command("pip install 'transformers>=4.30.0,<4.36.0'", "Installing transformers"):
-        print("❌ Failed to install transformers")
+        print("[ERROR] Failed to install transformers")
         return False
     
     # Step 5: Install sentence-transformers
-    print("\n📦 Installing sentence-transformers...")
+    print("\n[INFO] Installing sentence-transformers...")
     if not run_command("pip install 'sentence-transformers>=2.2.0,<2.3.0'", "Installing sentence-transformers"):
-        print("❌ Failed to install sentence-transformers")
+        print("[ERROR] Failed to install sentence-transformers")
         return False
     
     # Step 6: Test the installation
-    print("\n🧪 Testing Hugging Face compatibility...")
+    print("\n[INFO] Testing Hugging Face compatibility...")
     test_code = """
 try:
     from huggingface_hub import hf_hub_download
@@ -78,12 +78,12 @@ except Exception as e:
     success = run_command(f"python -c \"{test_code}\"", "Testing compatibility")
     
     if success:
-        print("\n✅ Compatible versions installed successfully!")
+        print("\n[SUCCESS] Compatible versions installed successfully!")
     else:
-        print("\n⚠️ Some issues remain, trying alternative approach...")
+        print("\n[WARNING] Some issues remain, trying alternative approach...")
         
         # Alternative: Install minimal versions
-        print("\n📦 Installing minimal working versions...")
+        print("\n[INFO] Installing minimal working versions...")
         minimal_packages = [
             "transformers==4.21.0",
             "sentence-transformers==2.1.0"
@@ -92,7 +92,7 @@ except Exception as e:
         for package in minimal_packages:
             run_command(f"pip install {package}", f"Installing {package}")
     
-    print("\n📋 Next steps:")
+    print("\n[INFO] Next steps:")
     print("1. Run: python main.py")
     print("2. If you still get import errors, try the minimal installation")
 
