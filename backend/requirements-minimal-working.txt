@@ -1,0 +1,36 @@
+# Minimal working requirements that are known to be compatible
+# Use this if the main requirements fail
+
+# Core web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
+pydantic>=2.5.0
+
+# Document processing (essential)
+PyPDF2==3.0.1
+python-docx==1.1.0
+
+# Basic ML (lightweight versions)
+numpy>=1.19.0,<2.0
+
+# Compatible Hugging Face versions (older but stable)
+huggingface-hub==0.16.4
+transformers==4.21.0
+sentence-transformers==2.1.0
+tokenizers==0.13.3
+
+# Alternative vector search (no compilation)
+chromadb==0.4.15
+
+# Web utilities
+requests==2.31.0
+beautifulsoup4==4.12.2
+
+# Database
+sqlalchemy==2.0.23
+
+# Utilities
+aiofiles==23.2.1
+loguru==0.7.2

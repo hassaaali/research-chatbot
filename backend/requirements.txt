@@ -16,8 +16,13 @@ spacy>=3.7.0,<3.8.0
 
 # Vector database and embeddings - FIXED numpy compatibility
 numpy>=1.19.0,<2.0
-sentence-transformers==2.2.2
 scikit-learn==1.3.2
+
+# FIXED: Compatible Hugging Face versions
+huggingface-hub>=0.16.0,<0.20.0
+sentence-transformers==2.2.2
+transformers==4.35.2
+tokenizers==0.15.0
 
 # Vector search - FAISS with fallback options
 # Try: pip install faiss-cpu --no-cache-dir
@@ -25,12 +30,10 @@ scikit-learn==1.3.2
 # Or: pip install chromadb (alternative)
 faiss-cpu==1.7.4
 
-# Hugging Face - updated PyTorch to available version
-transformers==4.36.2
-torch>=2.2.0
+# PyTorch - updated to available version
+torch>=2.1.0
 accelerate==0.25.0
 datasets==2.15.0
-tokenizers==0.15.0
 
 # Web search and scraping
 requests==2.31.0
