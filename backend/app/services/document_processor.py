@@ -183,9 +183,10 @@ class DocumentProcessor:
         # Remove excessive whitespace
         text = ' '.join(text.split())
         
-        # Remove special characters but keep punctuation - FIXED REGEX
+        # Remove special characters but keep basic punctuation - FIXED REGEX
         import re
-        text = re.sub(r'[^\w\s.,!?;:()\-"\'']', ' ', text)
+        # Keep word characters, whitespace, and basic punctuation
+        text = re.sub(r'[^\w\s.,!?;:()\-"\']', ' ', text)
         
         # Remove multiple spaces
         text = re.sub(r'\s+', ' ', text)
