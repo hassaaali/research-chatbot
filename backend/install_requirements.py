@@ -24,6 +24,33 @@ def install_package(package, description=None):
     desc = description or f"Installing {package}"
     return run_command(f"pip install {package}", desc)
 
+def install_spacy():
+    """Install spaCy with compatibility fixes"""
+    print("\n🔤 Installing spaCy with compatibility fixes...")
+    
+    # Method 1: Try with compatible Pydantic version
+    print("📦 Installing compatible Pydantic first...")
+    if install_package("'pydantic>=1.10.0,<2.0.0'", "Installing Pydantic v1"):
+        print("📦 Now installing spaCy...")
+        if install_package("'spacy>=3.7.0,<3.8.0'", "Installing spaCy"):
+            # Try to download the model
+            if run_command("python -m spacy download en_core_web_sm", "Downloading spaCy model"):
+                return True
+            else:
+                print("⚠️ spaCy installed but model download failed")
+                return True
+    
+    # Method 2: Try older spaCy version
+    print("📦 Trying older spaCy version...")
+    if install_package("spacy==3.6.1", "Installing spaCy 3.6.1"):
+        run_command("python -m spacy download en_core_web_sm", "Downloading spaCy model")
+        return True
+    
+    # Method 3: Skip spaCy for now
+    print("⚠️ spaCy installation failed, continuing without it")
+    print("   The system will work with basic text processing")
+    return False
+
 def install_faiss():
     """Install FAISS with multiple fallback methods"""
     print("\n🔍 Installing FAISS (vector search library)...")
@@ -50,9 +77,9 @@ def install_faiss():
     # Method 3: Try alternative vector search library
     print("⚠️ FAISS installation failed, trying alternative vector search...")
     alternatives = [
-        "chromadb",
-        "hnswlib",
-        "annoy"
+        "chromadb==0.4.15",
+        "hnswlib==0.7.0",
+        "annoy==1.17.3"
     ]
     
     for alt in alternatives:
@@ -96,6 +123,13 @@ def main():
     print("🚀 Installing Research Paper RAG Backend Dependencies")
     print("=" * 60)
     
+    # Check Python version
+    python_version = sys.version_info
+    print(f"📍 Python version: {python_version.major}.{python_version.minor}.{python_version.micro}")
+    
+    if python_version.major == 3 and python_version.minor >= 12:
+        print("⚠️ Python 3.12+ detected - using compatibility mode")
+    
     # Upgrade pip first
     print("\n📦 Upgrading pip...")
     run_command("python -m pip install --upgrade pip", "Upgrading pip")
@@ -105,21 +139,20 @@ def main():
     install_package("setuptools>=65.0.0", "Installing setuptools")
     install_package("wheel", "Installing wheel")
     
-    # Core dependencies first
+    # Core dependencies first - with compatible Pydantic
     core_packages = [
         "fastapi==0.104.1",
         "uvicorn[standard]==0.24.0",
         "python-multipart==0.0.6",
         "python-dotenv==1.0.0",
-        "pydantic==2.5.0",
-        "pydantic-settings==2.1.0"
+        "'pydantic>=1.10.0,<2.0.0'"  # Compatible version for spaCy
     ]
     
     print("\n📋 Installing core FastAPI dependencies...")
     for package in core_packages:
         install_package(package)
     
-    # Document processing
+    # Document processing (without spaCy for now)
     doc_packages = [
         "PyPDF2==3.0.1",
         "python-docx==1.1.0",
@@ -152,11 +185,8 @@ def main():
     # Install FAISS with fallbacks
     faiss_success = install_faiss()
     
-    # Try to install spaCy
-    print("\n🔤 Installing spaCy...")
-    if install_package("spacy==3.7.2"):
-        print("📥 Downloading spaCy English model...")
-        run_command("python -m spacy download en_core_web_sm", "Downloading spaCy model")
+    # Try to install spaCy with compatibility fixes
+    spacy_success = install_spacy()
     
     # Web and utility dependencies
     util_packages = [
@@ -191,6 +221,7 @@ def main():
     print("\n📊 Installation Summary:")
     print(f"   PyTorch: {'✅ Installed' if pytorch_success else '❌ Failed'}")
     print(f"   FAISS: {'✅ Installed' if faiss_success else '❌ Failed (using alternative)'}")
+    print(f"   spaCy: {'✅ Installed' if spacy_success else '❌ Failed (using basic text processing)'}")
     
     print("\n📋 Next steps:")
     print("1. Run: python main.py")
@@ -208,6 +239,12 @@ def main():
         print("   - macOS: brew install swig")
         print("   - Ubuntu: sudo apt-get install swig")
         print("   - Windows: Download from http://www.swig.org/download.html")
+    
+    if not spacy_success:
+        print("\n⚠️ spaCy installation failed due to Pydantic compatibility.")
+        print("   The system will work with basic text processing.")
+        print("   To fix manually, try:")
+        print("   pip install 'pydantic>=1.10.0,<2.0.0' spacy==3.6.1")
 
 if __name__ == "__main__":
     main()
