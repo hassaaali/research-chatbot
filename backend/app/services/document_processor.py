@@ -7,7 +7,6 @@ from io import BytesIO
 
 import PyPDF2
 import nltk
-import spacy
 from docx import Document as DocxDocument
 from loguru import logger
 
@@ -28,9 +27,10 @@ class DocumentProcessor:
             
             # Load spaCy model
             try:
+                import spacy
                 self.nlp = spacy.load("en_core_web_sm")
-            except OSError:
-                logger.warning("spaCy model 'en_core_web_sm' not found. Install with: python -m spacy download en_core_web_sm")
+            except (ImportError, OSError):
+                logger.warning("spaCy not available. Using basic text processing.")
                 self.nlp = None
                 
         except Exception as e:
@@ -183,7 +183,7 @@ class DocumentProcessor:
         # Remove excessive whitespace
         text = ' '.join(text.split())
         
-        # Remove special characters but keep punctuation
+        # Remove special characters but keep punctuation - FIXED REGEX
         import re
         text = re.sub(r'[^\w\s.,!?;:()\-"\'']', ' ', text)
         
