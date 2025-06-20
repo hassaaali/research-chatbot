@@ -61,18 +61,18 @@ def main():
     test_code = """
 try:
     from huggingface_hub import hf_hub_download
-    print("✅ huggingface_hub working correctly")
+    print("SUCCESS: huggingface_hub working correctly")
     
     import transformers
-    print(f"✅ transformers version: {transformers.__version__}")
+    print("SUCCESS: transformers version:", transformers.__version__)
     
     import sentence_transformers
-    print(f"✅ sentence_transformers version: {sentence_transformers.__version__}")
+    print("SUCCESS: sentence_transformers version:", sentence_transformers.__version__)
     
-    print("✅ All Hugging Face packages compatible")
+    print("SUCCESS: All Hugging Face packages compatible")
     
 except Exception as e:
-    print(f"❌ Error: {e}")
+    print("ERROR:", str(e))
 """
     
     success = run_command(f"python -c \"{test_code}\"", "Testing compatibility")
