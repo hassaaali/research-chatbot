@@ -1,0 +1,20 @@
+{
+  "name": "operative-site",
+  "type": "module",
+  "dependencies": {
+    "vite": "^5.4.2",
+    "dom-to-image-more": "^3.6.0",
+    "pdfjs-dist": "^4.0.379",
+    "lucide": "^0.293.0"
+  },
+  "scripts": {
+    "dev": "vite --port 3000",
+    "lint": "eslint . --ext .js --no-color -f json",
+    "build": "vite build",
+    "preview": "vite preview --port 3000"
+  },
+  "devDependencies": {
+    "eslint": "^9.27.0",
+    "@eslint/js": "^9.27.0"
+  }
+}

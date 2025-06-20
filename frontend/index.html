@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Research Paper Chat Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/debug-bridge.js"></script>
+
+    <!-- Screenshot capture listener -->
+    <script>
+      window.addEventListener('message', e => {
+        if (e.data === 'capture-webc') {
+          domtoimage.toPng(document.documentElement).then(png => {
+            window.parent.postMessage({ webcScreenshot: png }, '*');
+          });
+        }
+      });
+    </script>
+
+    <!-- Helper script to expose clickable elements & click actions to parent via postMessage -->
+    <script>
+      window.addEventListener('message', e => {
+        // ---------------------- list clickable elements ----------------------
+        if (e.data === 'get-clickables') {
+          const selectors = [
+            'a',
+            'button',
+            '[role="button"]',
+            'input[type="button"]',
+            'input[type="submit"]',
+            '[onclick]',
+            '.clickable',
+            '[class*="btn"]',
+            '[class*="button"]'
+          ];
+
+          const elements = Array.from(document.querySelectorAll(selectors.join(',')));
+          const list = elements.map((el, index) => {
+            const rect = el.getBoundingClientRect();
+            const id = el.id;
+            const classes = Array.from(el.classList).join(' ');
+            const tag = el.tagName.toLowerCase();
+            let selector = '';
+            if (id) selector = '#' + id;
+            else if (classes) selector = tag + '.' + classes.split(' ').join('.');
+            else selector = tag + ':nth-of-type(' + (index + 1) + ')';
+            return {
+              index,
+              tagName: el.tagName.toLowerCase(),
+              text: (el.innerText || el.textContent || '').trim().substring(0, 100),
+              selector,
+              rect: {
+                x: Math.round(rect.left),
+                y: Math.round(rect.top),
+                width: Math.round(rect.width),
+                height: Math.round(rect.height)
+              }
+            };
+          });
+          window.parent.postMessage({ webcClickables: list }, '*');
+        }
+
+        // ---------------------- click element request ----------------------
+        else if (typeof e.data === 'object' && e.data !== null && (e.data.clickElementIndex !== undefined || e.data.clickElementSelector)) {
+          let el = null;
+          const selectors = [
+            'a',
+            'button',
+            '[role="button"]',
+            'input[type="button"]',
+            'input[type="submit"]',
+            '[onclick]',
+            '.clickable',
+            '[class*="btn"]',
+            '[class*="button"]'
+          ];
+
+          if (e.data.clickElementIndex !== undefined) {
+            const elements = Array.from(document.querySelectorAll(selectors.join(',')));
+            el = elements[e.data.clickElementIndex];
+          } else if (e.data.clickElementSelector) {
+            el = document.querySelector(e.data.clickElementSelector);
+          }
+
+          if (el) {
+            el.click();
+            window.parent.postMessage({ webcClickAck: true }, '*');
+          } else {
+            window.parent.postMessage({ webcClickAck: false, error: 'Element not found' }, '*');
+          }
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <div id="app">
+      <div class="app-container">
+        <aside class="document-sidebar" id="documentSidebar">
+          <div class="sidebar-header">
+            <h2>Research Papers</h2>
+            <button class="upload-btn" id="uploadBtn">
+              <span class="icon-upload"></span>
+              Upload Papers
+            </button>
+            <button class="demo-btn" id="demoBtn">
+              <span class="icon-demo"></span>
+              Try Demo
+            </button>
+          </div>
+          <div class="document-list" id="documentList">
+            <div class="empty-state">
+              <div class="empty-icon"></div>
+              <p>No papers uploaded yet</p>
+              <small>Upload PDF files to start analyzing</small>
+            </div>
+          </div>
+        </aside>
+        
+        <main class="chat-container">
+          <header class="chat-header">
+            <div class="header-content">
+              <h1>Research Paper Assistant</h1>
+              <p>Ask questions about your uploaded research papers</p>
+            </div>
+            <button class="sidebar-toggle" id="sidebarToggle">
+              <span class="icon-menu"></span>
+            </button>
+          </header>
+          
+          <div class="chat-messages" id="chatMessages">
+            <div class="welcome-message">
+              <div class="welcome-icon"></div>
+              <h3>Welcome to Research Paper Assistant</h3>
+              <p>Upload your research papers and start asking questions about their content. I'll help you analyze, summarize, and find insights from your documents.</p>
+            </div>
+          </div>
+          
+          <div class="chat-input-container">
+            <div class="chat-input-wrapper">
+              <textarea 
+                id="chatInput" 
+                placeholder="Ask a question about your research papers..."
+                rows="1"
+                disabled
+              ></textarea>
+              <button class="send-btn" id="sendBtn" disabled>
+                <span class="icon-send"></span>
+              </button>
+            </div>
+            <p class="input-hint">Upload research papers to start asking questions</p>
+          </div>
+        </main>
+      </div>
+      
+      <input type="file" id="fileInput" multiple accept=".pdf" style="display: none;">
+      
+      <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p>Processing documents...</p>
+      </div>
+    </div>
+    
+    <script type="module" src="/src/index.js"></script>
+  </body>
+</html>
