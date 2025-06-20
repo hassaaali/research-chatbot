@@ -32,11 +32,14 @@ pip install sentence-transformers
 ```
 
 ### 3. PyTorch Installation Issues
-For PyTorch compatibility:
+For PyTorch compatibility (UPDATED):
 
 ```bash
-# CPU version (recommended for most users)
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+# CPU version (recommended for most users) - Latest available version
+pip install torch>=2.2.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Alternative: Let pip choose the version
+pip install torch torchvision torchaudio
 
 # Or use conda
 conda install pytorch torchvision torchaudio cpuonly -c pytorch
@@ -97,6 +100,18 @@ pip install fastapi uvicorn python-multipart python-dotenv
 pip install PyPDF2 requests sqlalchemy loguru
 ```
 
+### Method 4: Manual PyTorch Installation
+If PyTorch continues to fail:
+
+```bash
+# Visit https://pytorch.org/get-started/locally/ and get the exact command for your system
+# For CPU-only on most systems:
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# For systems with CUDA (if you have a compatible GPU):
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
 ## Running Without Advanced Features
 
 If you can't install all dependencies, you can run with limited features:
@@ -104,6 +119,7 @@ If you can't install all dependencies, you can run with limited features:
 1. **Without Hugging Face models**: Set `TEXT_GENERATION_MODEL=""` in .env
 2. **Without web search**: Set `ENABLE_WEB_SEARCH=False` in .env
 3. **Without spaCy**: The system will work with basic text processing
+4. **Without PyTorch**: Some advanced features will be disabled
 
 ## Getting Help
 
@@ -114,3 +130,18 @@ If you continue to have issues:
 3. Try creating a fresh virtual environment
 4. Consider using Python 3.11 instead of 3.12
 5. Check the logs in `logs/app.log` for detailed error messages
+6. Try installing packages one by one to identify the problematic package
+
+## Quick Fix Commands
+
+```bash
+# If all else fails, try this minimal installation:
+pip install fastapi uvicorn python-multipart python-dotenv pydantic
+pip install PyPDF2 python-docx requests beautifulsoup4 sqlalchemy loguru aiofiles
+
+# Then try to add ML packages one by one:
+pip install numpy
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install sentence-transformers
+pip install faiss-cpu
+```

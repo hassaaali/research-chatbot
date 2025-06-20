@@ -65,10 +65,24 @@ def main():
     print("\n🔢 Installing NumPy with compatible version...")
     install_package("'numpy>=1.19.0,<2.0'", "Installing NumPy")
     
-    # Install PyTorch (CPU version for compatibility)
+    # Install PyTorch (CPU version for compatibility) - Updated version
     print("\n🔥 Installing PyTorch...")
-    torch_command = "pip install torch==2.1.2 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu"
-    run_command(torch_command, "Installing PyTorch CPU")
+    torch_success = False
+    
+    # Try different PyTorch installation methods
+    torch_commands = [
+        "pip install torch>=2.2.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu",
+        "pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu",
+        "pip install torch torchvision torchaudio"
+    ]
+    
+    for cmd in torch_commands:
+        if run_command(cmd, "Installing PyTorch"):
+            torch_success = True
+            break
+    
+    if not torch_success:
+        print("⚠️ PyTorch installation failed, continuing with other packages...")
     
     # Install other ML packages
     ml_packages = [
@@ -120,6 +134,11 @@ def main():
     print("1. Run: python main.py")
     print("2. The backend will be available at http://localhost:8000")
     print("3. Check the logs for any remaining issues")
+    
+    if not torch_success:
+        print("\n⚠️ PyTorch installation failed. You can try installing it manually:")
+        print("   pip install torch torchvision torchaudio")
+        print("   or visit: https://pytorch.org/get-started/locally/")
 
 if __name__ == "__main__":
     main()
