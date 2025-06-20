@@ -1,18 +1,18 @@
 import './styles/main.css';
-import PDFProcessor from './utils/pdfProcessor.js';
-import DocumentSearch from './utils/documentSearch.js';
+import APIClient from './utils/api.js';
 
 class ResearchChatApp {
   constructor() {
-    this.pdfProcessor = new PDFProcessor();
-    this.documentSearch = new DocumentSearch(this.pdfProcessor);
+    this.apiClient = APIClient;
     this.activeDocuments = [];
     this.chatHistory = [];
     this.isSidebarOpen = false;
+    this.isBackendConnected = false;
     
     this.initializeElements();
     this.bindEvents();
-    this.loadStoredDocuments();
+    this.checkBackendConnection();
+    this.loadDocuments();
   }
 
   initializeElements() {
@@ -58,6 +58,44 @@ class ResearchChatApp {
     window.addEventListener('resize', () => this.handleResize());
   }
 
+  async checkBackendConnection() {
+    try {
+      await this.apiClient.healthCheck();
+      this.isBackendConnected = true;
+      this.showNotification('Connected to backend server', 'success');
+      this.updateChatInputState();
+    } catch (error) {
+      this.isBackendConnected = false;
+      this.showNotification('Backend server not available. Please start the Python backend.', 'error');
+      this.updateChatInputState();
+    }
+  }
+
+  async loadDocuments() {
+    if (!this.isBackendConnected) return;
+
+    try {
+      const response = await this.apiClient.getDocuments();
+      if (response.success) {
+        this.clearDocumentList();
+        response.documents.forEach(doc => {
+          this.addDocumentToUI(doc);
+          if (doc.is_processed) {
+            this.activeDocuments.push(doc.id.toString());
+          }
+        });
+        this.updateChatInputState();
+      }
+    } catch (error) {
+      console.error('Failed to load documents:', error);
+    }
+  }
+
+  clearDocumentList() {
+    this.documentList.innerHTML = '';
+    this.activeDocuments = [];
+  }
+
   setupDragAndDrop() {
     const dropZones = [this.documentSidebar, this.chatMessages];
     
@@ -84,32 +122,83 @@ class ResearchChatApp {
   }
 
   async handleFileUpload(files) {
-    const pdfFiles = Array.from(files).filter(file => file.type === 'application/pdf');
-    
-    if (pdfFiles.length === 0) {
-      this.showNotification('Please upload PDF files only.', 'error');
+    if (!this.isBackendConnected) {
+      this.showNotification('Backend server not available', 'error');
       return;
     }
 
-    this.showLoading('Processing documents...');
+    const pdfFiles = Array.from(files).filter(file => 
+      file.type === 'application/pdf' || 
+      file.name.endsWith('.pdf') ||
+      file.name.endsWith('.txt') ||
+      file.name.endsWith('.docx')
+    );
+    
+    if (pdfFiles.length === 0) {
+      this.showNotification('Please upload PDF, TXT, or DOCX files only.', 'error');
+      return;
+    }
+
+    this.showLoading('Uploading and processing documents...');
     
     try {
-      for (const file of pdfFiles) {
-        const document = await this.pdfProcessor.processFile(file);
-        this.addDocumentToUI(document);
-        this.activeDocuments.push(document.id);
+      const response = await this.apiClient.uploadDocuments(pdfFiles);
+      
+      if (response.success) {
+        this.showNotification(`Successfully uploaded ${pdfFiles.length} document(s)`, 'success');
+        
+        // Reload documents to get updated list
+        await this.loadDocuments();
+        
+        // Poll for processing status
+        response.documents.forEach(doc => {
+          if (doc.status === 'uploaded') {
+            this.pollDocumentStatus(doc.id);
+          }
+        });
       }
       
-      this.updateChatInputState();
-      this.saveDocuments();
-      this.showNotification(`Successfully processed ${pdfFiles.length} document(s)`, 'success');
-      
     } catch (error) {
-      console.error('Error processing files:', error);
-      this.showNotification('Error processing documents. Please try again.', 'error');
+      console.error('Error uploading files:', error);
+      this.showNotification('Error uploading documents. Please try again.', 'error');
     } finally {
       this.hideLoading();
     }
+  }
+
+  async pollDocumentStatus(documentId) {
+    const maxAttempts = 30; // 5 minutes max
+    let attempts = 0;
+
+    const poll = async () => {
+      try {
+        const response = await this.apiClient.getDocumentStatus(documentId);
+        
+        if (response.success) {
+          const status = response.status;
+          
+          if (status.processing_status === 'completed') {
+            // Reload documents to update UI
+            await this.loadDocuments();
+            this.showNotification('Document processing completed', 'success');
+            return;
+          } else if (status.processing_status === 'failed') {
+            this.showNotification(`Document processing failed: ${status.error_message}`, 'error');
+            return;
+          }
+        }
+        
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(poll, 10000); // Poll every 10 seconds
+        }
+        
+      } catch (error) {
+        console.error('Error polling document status:', error);
+      }
+    };
+
+    poll();
   }
 
   addDocumentToUI(document) {
@@ -123,20 +212,41 @@ class ResearchChatApp {
     documentItem.className = 'document-item';
     documentItem.dataset.documentId = document.id;
     
+    const statusClass = document.is_processed ? 'processed' : 
+                       document.processing_status === 'processing' ? 'processing' : 
+                       document.processing_status === 'failed' ? 'failed' : 'pending';
+    
     documentItem.innerHTML = `
-      <div class="document-name" title="${document.name}">${document.name}</div>
+      <div class="document-name" title="${document.original_filename}">${document.original_filename}</div>
       <div class="document-info">
-        <span class="document-pages">${document.pages} pages</span>
-        <span class="document-size">${document.size}</span>
+        <span class="document-pages">${document.total_pages || 0} pages</span>
+        <span class="document-size">${this.formatFileSize(document.file_size)}</span>
       </div>
-      <div class="processing-indicator" style="display: none;">
-        Processing document...
+      <div class="document-status ${statusClass}">
+        ${this.getStatusText(document.processing_status, document.is_processed)}
       </div>
     `;
     
-    documentItem.addEventListener('click', () => this.toggleDocumentSelection(document.id));
+    if (document.is_processed) {
+      documentItem.addEventListener('click', () => this.toggleDocumentSelection(document.id.toString()));
+    }
     
     this.documentList.appendChild(documentItem);
+  }
+
+  getStatusText(processingStatus, isProcessed) {
+    if (isProcessed) return '✅ Ready';
+    if (processingStatus === 'processing') return '⏳ Processing...';
+    if (processingStatus === 'failed') return '❌ Failed';
+    return '⏳ Pending...';
+  }
+
+  formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
   toggleDocumentSelection(documentId) {
@@ -156,23 +266,27 @@ class ResearchChatApp {
   }
 
   updateChatInputState() {
-    const hasDocuments = this.pdfProcessor.getAllDocuments().length > 0;
+    const hasBackend = this.isBackendConnected;
+    const hasProcessedDocs = this.documentList.querySelectorAll('.document-item .document-status.processed').length > 0;
     
-    this.chatInput.disabled = !hasDocuments;
-    this.sendBtn.disabled = !hasDocuments;
+    this.chatInput.disabled = !hasBackend || !hasProcessedDocs;
+    this.sendBtn.disabled = !hasBackend || !hasProcessedDocs;
     
-    if (hasDocuments) {
+    if (!hasBackend) {
+      this.chatInput.placeholder = 'Backend server not available...';
+      this.inputHint.textContent = 'Please start the Python backend server';
+    } else if (!hasProcessedDocs) {
+      this.chatInput.placeholder = 'Upload and process documents to start asking questions...';
+      this.inputHint.textContent = 'Upload research papers to start asking questions';
+    } else {
       this.chatInput.placeholder = 'Ask a question about your research papers...';
       this.inputHint.textContent = `${this.activeDocuments.length || 'All'} document(s) selected for search`;
-    } else {
-      this.chatInput.placeholder = 'Upload research papers to start asking questions...';
-      this.inputHint.textContent = 'Upload research papers to start asking questions';
     }
   }
 
   async handleSendMessage() {
     const message = this.chatInput.value.trim();
-    if (!message) return;
+    if (!message || !this.isBackendConnected) return;
 
     // Add user message to chat
     this.addMessageToChat(message, 'user');
@@ -183,15 +297,17 @@ class ResearchChatApp {
     const typingId = this.showTypingIndicator();
 
     try {
-      // Process the query
-      const searchDocuments = this.activeDocuments.length > 0 ? this.activeDocuments : null;
-      const result = await this.documentSearch.processQuery(message, searchDocuments);
+      // Send message to backend
+      const response = await this.apiClient.sendMessage(message, {
+        documentIds: this.activeDocuments.length > 0 ? this.activeDocuments : null,
+        includeWebSearch: true
+      });
       
       // Remove typing indicator
       this.removeTypingIndicator(typingId);
       
       // Add assistant response
-      this.addMessageToChat(result.response, 'assistant', result.citations);
+      this.addMessageToChat(response.answer, 'assistant', response.sources);
       
     } catch (error) {
       console.error('Error processing query:', error);
@@ -200,7 +316,7 @@ class ResearchChatApp {
     }
   }
 
-  addMessageToChat(content, sender, citations = []) {
+  addMessageToChat(content, sender, sources = null) {
     // Remove welcome message if it exists
     const welcomeMessage = this.chatMessages.querySelector('.welcome-message');
     if (welcomeMessage) {
@@ -217,16 +333,15 @@ class ResearchChatApp {
     const messageContent = document.createElement('div');
     messageContent.className = 'message-content';
     
-    // Process content with citations
-    let processedContent = content;
-    if (citations && citations.length > 0) {
-      citations.forEach((citation, index) => {
-        const citationSpan = `<span class="citation" data-citation="${index + 1}" title="${citation.document}">[${index + 1}]</span>`;
-        processedContent = processedContent.replace(`[${index + 1}]`, citationSpan);
-      });
+    // Format content
+    let formattedContent = this.formatMessageContent(content);
+    
+    // Add sources if available
+    if (sources && sender === 'assistant') {
+      formattedContent += this.formatSources(sources);
     }
     
-    messageContent.innerHTML = this.formatMessageContent(processedContent);
+    messageContent.innerHTML = formattedContent;
     
     messageDiv.appendChild(avatar);
     messageDiv.appendChild(messageContent);
@@ -238,7 +353,7 @@ class ResearchChatApp {
     this.chatHistory.push({
       content,
       sender,
-      citations,
+      sources,
       timestamp: new Date()
     });
   }
@@ -252,6 +367,28 @@ class ResearchChatApp {
       .replace(/\n/g, '<br>');
     
     return `<p>${formatted}</p>`;
+  }
+
+  formatSources(sources) {
+    let sourcesHtml = '';
+    
+    if (sources.documents && sources.documents.length > 0) {
+      sourcesHtml += '<div class="sources"><h4>Document Sources:</h4><ul>';
+      sources.documents.forEach((source, index) => {
+        sourcesHtml += `<li><strong>Document ${source.document_id}</strong> (Similarity: ${(source.similarity * 100).toFixed(1)}%)</li>`;
+      });
+      sourcesHtml += '</ul></div>';
+    }
+    
+    if (sources.web && sources.web.length > 0) {
+      sourcesHtml += '<div class="sources"><h4>Web Sources:</h4><ul>';
+      sources.web.forEach((source, index) => {
+        sourcesHtml += `<li><a href="${source.url}" target="_blank">${source.title}</a></li>`;
+      });
+      sourcesHtml += '</ul></div>';
+    }
+    
+    return sourcesHtml;
   }
 
   showTypingIndicator() {
@@ -337,83 +474,9 @@ class ResearchChatApp {
     });
   }
 
-  saveDocuments() {
-    try {
-      const documentData = this.pdfProcessor.getAllDocuments().map(doc => ({
-        id: doc.id,
-        name: doc.name,
-        size: doc.size,
-        pages: doc.pages,
-        content: doc.content,
-        pageContents: doc.pageContents,
-        uploadDate: doc.uploadDate
-      }));
-      
-      localStorage.setItem('researchDocuments', JSON.stringify(documentData));
-    } catch (error) {
-      console.warn('Could not save documents to localStorage:', error);
-    }
-  }
-
-  loadStoredDocuments() {
-    try {
-      const stored = localStorage.getItem('researchDocuments');
-      if (stored) {
-        const documentData = JSON.parse(stored);
-        
-        documentData.forEach(docData => {
-          // Recreate document object
-          this.pdfProcessor.documents.set(docData.id, {
-            ...docData,
-            uploadDate: new Date(docData.uploadDate)
-          });
-          
-          this.addDocumentToUI(docData);
-        });
-        
-        this.updateChatInputState();
-      }
-    } catch (error) {
-      console.warn('Could not load stored documents:', error);
-    }
-  }
-
-  // Demo function to add sample documents for testing
-  addDemoDocuments() {
-    // Clear existing documents first
-    this.pdfProcessor.documents.clear();
-    this.documentList.innerHTML = '';
-    this.activeDocuments = [];
-
-    const demoDocuments = [
-      {
-        id: 'demo1',
-        name: 'Machine Learning in Healthcare.pdf',
-        size: '2.3 MB',
-        pages: 24,
-        content: 'Machine learning is revolutionizing healthcare through predictive analytics, diagnostic assistance, and treatment optimization. Recent studies show that ML algorithms can predict patient outcomes with 85% accuracy. Diagnostic imaging enhanced by deep learning models shows improved detection rates for early-stage diseases. Treatment personalization using ML helps optimize drug dosages and reduces adverse effects.',
-        pageContents: ['Introduction to ML in healthcare...', 'Predictive analytics applications...'],
-        uploadDate: new Date()
-      },
-      {
-        id: 'demo2',
-        name: 'Quantum Computing Research.pdf',
-        size: '1.8 MB',
-        pages: 18,
-        content: 'Quantum computing represents a paradigm shift in computational power. Current research focuses on quantum supremacy, error correction, and practical applications. Quantum algorithms like Shor\'s algorithm demonstrate exponential speedup for factoring large numbers. Applications in cryptography, optimization, and drug discovery show promising results.',
-        pageContents: ['Quantum computing fundamentals...', 'Current research directions...'],
-        uploadDate: new Date()
-      }
-    ];
-
-    demoDocuments.forEach(doc => {
-      this.pdfProcessor.documents.set(doc.id, doc);
-      this.addDocumentToUI(doc);
-      this.activeDocuments.push(doc.id);
-    });
-
-    this.updateChatInputState();
-    this.showNotification('Demo documents loaded! You can now ask questions about machine learning and quantum computing.', 'success');
+  // Demo function - now uses backend
+  async addDemoDocuments() {
+    this.showNotification('Demo mode now requires uploading actual documents. Please use the upload button to add your research papers.', 'info');
   }
 }
 
